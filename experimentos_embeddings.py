@@ -50,13 +50,18 @@ def main_face_data_experiments(json_path):
     tsne = TSNE(n_components=2, random_state=42)
     X_tsne = tsne.fit_transform(X)
     for data, name in [(X_pca, "pca"), (X_tsne, "tsne")]:
-        plt.figure()
+        plt.figure(figsize=(8, 6))
         for person in set(labels):
             idx = [i for i, l in enumerate(labels) if l == person]
-            plt.scatter(data[idx, 0], data[idx, 1], label=person, s=40, alpha=0.7)
-        plt.legend()
+            plt.scatter(data[idx, 0], data[idx, 1], label=person, s=80, alpha=0.8, edgecolors='k', linewidths=0.5)
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.title(name.upper())
-        plt.savefig(f"{OUTPUT_DIR}/{name}_face_data.png")
+        plt.xlabel("Componente 1")
+        plt.ylabel("Componente 2")
+        plt.xlim(data[:, 0].min() - 1, data[:, 0].max() + 1)
+        plt.ylim(data[:, 1].min() - 1, data[:, 1].max() + 1)
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
+        plt.savefig(f"{OUTPUT_DIR}/{name}_face_data.png", bbox_inches='tight')
         plt.close()
 import os
 from collections import defaultdict
@@ -95,26 +100,20 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 def load_dataset(path):
 
     dataset = defaultdict(lambda: {"reference": None, "tests": []})
-    for filename in os.listdir(path):
-        if not filename.lower().endswith((".jpg", ".png", ".jpeg")):
+    # Recorrer subcarpetas (una por persona)
+    for person_folder in os.listdir(path):
+        person_path = os.path.join(path, person_folder)
+        if not os.path.isdir(person_path):
             continue
-        name_part = os.path.splitext(filename)[0]
-        match = re.match(r"(.+?)(\d+)$", name_part)
-        if not match:
-            print(f"Nombre inválido: {filename}")
-            continue
-        person = match.group(1)
-        number = match.group(2)
-        image_path = os.path.join(path, filename)
-        # Solo guardamos la ruta, no el embedding
-        if number == "1":
-            dataset[person]["reference"] = image_path
-        else:
-            dataset[person]["tests"].append(image_path)
-    for person in dataset:
-        print(person, len(dataset[person]["tests"]))
-
-
+        images = [f for f in os.listdir(person_path) if f.lower().endswith((".jpg", ".png", ".jpeg"))]
+        images.sort()  # Opcional: para que la referencia sea siempre la primera
+        for idx, filename in enumerate(images):
+            image_path = os.path.join(person_path, filename)
+            if idx == 0:
+                dataset[person_folder]["reference"] = image_path
+            else:
+                dataset[person_folder]["tests"].append(image_path)
+        print(person_folder, len(dataset[person_folder]["tests"]))
     return dataset
 
 
@@ -378,13 +377,18 @@ def visualize_embeddings_from_json(json_path):
     tsne = TSNE(n_components=2, random_state=42)
     X_tsne = tsne.fit_transform(X)
     for data, name in [(X_pca, "pca"), (X_tsne, "tsne")]:
-        plt.figure()
+        plt.figure(figsize=(8, 6))
         for person in set(labels):
             idx = [i for i, l in enumerate(labels) if l == person]
-            plt.scatter(data[idx, 0], data[idx, 1], s=0, label=person)
-        plt.legend()
+            plt.scatter(data[idx, 0], data[idx, 1], label=person, s=80, alpha=0.8, edgecolors='k', linewidths=0.5)
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.title(name.upper())
-        plt.savefig(f"{OUTPUT_DIR}/{name}.png")
+        plt.xlabel("Componente 1")
+        plt.ylabel("Componente 2")
+        plt.xlim(data[:, 0].min() - 1, data[:, 0].max() + 1)
+        plt.ylim(data[:, 1].min() - 1, data[:, 1].max() + 1)
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
+        plt.savefig(f"{OUTPUT_DIR}/{name}.png", bbox_inches='tight')
         plt.close()
 
 
