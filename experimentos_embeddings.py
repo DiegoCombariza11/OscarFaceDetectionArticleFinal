@@ -1,4 +1,54 @@
 # -----------------------------
+# BOOTSTRAP PARA INTERVALOS DE CONFIANZA
+# -----------------------------
+
+def bootstrap_mean_ci(distances, n_bootstrap=1000, ci=95, random_state=42):
+    """
+    Calcula el intervalo de confianza para la media usando bootstrap.
+    Retorna: media, (lower, upper)
+    """
+    np.random.seed(random_state)
+    means = []
+    distances = np.array(distances)
+    for _ in range(n_bootstrap):
+        sample = np.random.choice(distances, size=len(distances), replace=True)
+        means.append(np.mean(sample))
+    mean = np.mean(means)
+    lower = np.percentile(means, (100 - ci) / 2)
+    upper = np.percentile(means, 100 - (100 - ci) / 2)
+    return mean, (lower, upper)
+# -----------------------------
+# DISTANCIAS USANDO CENTROIDES
+# -----------------------------
+
+def compute_centroid_distances(embeddings):
+    """
+    Calcula distancias intra/inter usando centroides por persona.
+    Retorna:
+      intra_centroid: distancias de cada embedding al centroide de su persona
+      inter_centroid: distancias entre centroides de personas distintas
+    """
+    centroids = {}
+    intra_centroid = []
+    inter_centroid = []
+    # Calcular centroides
+    for person, embs in embeddings.items():
+        centroids[person] = np.mean(embs, axis=0)
+    # Intra: distancia de cada embedding al centroide de su persona
+    for person, embs in embeddings.items():
+        centroid = centroids[person]
+        for emb in embs:
+            intra_centroid.append(cosine(emb, centroid))
+    # Inter: distancias entre centroides de personas distintas
+    persons = list(centroids.keys())
+    for i in range(len(persons)):
+        for j in range(i + 1, len(persons)):
+            c1 = centroids[persons[i]]
+            c2 = centroids[persons[j]]
+            inter_centroid.append(cosine(c1, c2))
+    return intra_centroid, inter_centroid
+
+# -----------------------------
 # EXPERIMENTO INTRA/INTER Y PCA/t-SNE CON JSON EXTERNO
 # -----------------------------
 
@@ -14,17 +64,19 @@ def load_person_embeddings_from_face_data(json_path):
             if name and embedding:
                 if name not in person_embeddings:
                     person_embeddings[name] = []
-                person_embeddings[name].append(np.array(embedding))
+                emb = np.array(embedding)
+                emb = emb / np.linalg.norm(emb)
+                person_embeddings[name].append(emb)
     elif isinstance(data, dict):
         # Soporta el formato anterior
         for person, info in data.items():
             if isinstance(info, dict):
                 if "embeddings" in info:
-                    person_embeddings[person] = [np.array(e) for e in info["embeddings"]]
+                    person_embeddings[person] = [np.array(e) / np.linalg.norm(e) for e in info["embeddings"]]
                 elif "images" in info:
-                    person_embeddings[person] = [np.array(img["embedding"]) for img in info["images"] if "embedding" in img]
+                    person_embeddings[person] = [np.array(img["embedding"]) / np.linalg.norm(img["embedding"]) for img in info["images"] if "embedding" in img]
             elif isinstance(info, list):
-                person_embeddings[person] = [np.array(e) for e in info]
+                person_embeddings[person] = [np.array(e) / np.linalg.norm(e) for e in info]
     return person_embeddings
 
 # -----------------------------
@@ -132,7 +184,9 @@ def extract_embeddings(dataset):
                 model_name=MODEL_NAME,
                 enforce_detection=False
             )[0]["embedding"]
-            person_embeddings.append(np.array(emb))
+            emb = np.array(emb)
+            emb = emb / np.linalg.norm(emb)
+            person_embeddings.append(emb)
         # Procesar tests
         for img_path in imgs["tests"]:
             emb = DeepFace.represent(
@@ -140,7 +194,9 @@ def extract_embeddings(dataset):
                 model_name=MODEL_NAME,
                 enforce_detection=False
             )[0]["embedding"]
-            person_embeddings.append(np.array(emb))
+            emb = np.array(emb)
+            emb = emb / np.linalg.norm(emb)
+            person_embeddings.append(emb)
         embeddings[person] = np.array(person_embeddings)
     return embeddings
 
@@ -281,9 +337,11 @@ def load_embeddings_from_json(json_path):
                 person_embeddings[person] = []
             # Si emb_lists es una lista de embeddings (por estabilidad), tomar el primero
             if isinstance(emb_lists[0], list):
-                person_embeddings[person].append(np.array(emb_lists[0]))
+                emb = np.array(emb_lists[0])
             else:
-                person_embeddings[person].append(np.array(emb_lists))
+                emb = np.array(emb_lists)
+            emb = emb / np.linalg.norm(emb)
+            person_embeddings[person].append(emb)
     return person_embeddings
 
 def compute_distances(embeddings):
